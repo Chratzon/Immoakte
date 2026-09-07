@@ -1,0 +1,19 @@
+{
+  "name": "Immoakte – Kalkulation und Objektverwaltung",
+  "short_name": "Immoakte",
+  "description": "Immobilien kalkulieren, Anzeigen sammeln, Dokumente und Schriftverkehr je Objekt ablegen. Läuft offline, alle Daten bleiben auf dem Gerät.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#E7EBEC",
+  "theme_color": "#17232F",
+  "lang": "de",
+  "categories": ["finance", "productivity", "utilities"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

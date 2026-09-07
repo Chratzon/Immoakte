@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Immoakte – Kalkulation und Objektverwaltung</title>
+<meta name="description" content="Objekte kalkulieren, Anzeigen sammeln, Dokumente und Schriftverkehr ablegen. Läuft offline, alle Daten bleiben auf dem Gerät.">
+<meta name="theme-color" content="#17232F">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+:root{
+  --paper:#E7EBEC;
+  --sheet:#FFFFFF;
+  --sheet-2:#F5F7F7;
+  --ink:#17232F;
+  --ink-soft:#3C4C59;
+  --muted:#67787F;
+  --rule:#C9D3D7;
+  --rule-soft:#DFE5E7;
+  --blue:#1F5F8B;
+  --blue-dim:#E3ECF2;
+  --gold:#C8930F;
+  --gold-dim:#F7EEd4;
+  --pos:#1E7A5A;
+  --neg:#A8342A;
+  --r:6px;
+  --shadow:0 1px 0 var(--rule-soft);
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --pad:16px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --paper:#121A21; --sheet:#1A242D; --sheet-2:#202C36; --ink:#E6ECEF; --ink-soft:#C3CED5;
+    --muted:#8FA1AA; --rule:#2E3D48; --rule-soft:#26333D; --blue:#6FB0DA; --blue-dim:#1E2E3A;
+    --gold:#E2B94F; --gold-dim:#2A2517;
+    --pos:#4FBF92; --neg:#E5776B;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--sans);
+  font-size:15px; line-height:1.45;
+  color:var(--ink); background:var(--paper);
+  -webkit-text-size-adjust:100%;
+  overscroll-behavior-y:none;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+h1,h2,h3{margin:0;font-weight:600;letter-spacing:-0.01em}
+a{color:var(--blue)}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:3px}
+.num{font-variant-numeric:tabular-nums}
+.hidden{display:none !important}
+
+/* ---------- Kopfleiste ---------- */
+.topbar{
+  position:sticky;top:0;z-index:30;
+  background:var(--ink);color:#EAF0F2;
+  padding:calc(env(safe-area-inset-top) + 10px) var(--pad) 10px;
+  display:flex;align-items:center;gap:12px;
+}
+.brand{display:flex;align-items:baseline;gap:8px;min-width:0}
+.brand b{font-size:17px;font-weight:600;letter-spacing:0.02em}
+.brand span{font-size:12px;color:#8FA6B3;white-space:nowrap}
+.topbar .spacer{flex:1}
+.iconbtn{
+  background:transparent;border:1px solid #33465440;color:inherit;
+  width:34px;height:34px;border-radius:var(--r);display:grid;place-items:center;font-size:16px;
+}
+.iconbtn:hover{background:#ffffff14}
+.offline-dot{width:8px;height:8px;border-radius:50%;background:var(--gold);display:none}
+body.is-offline .offline-dot{display:block}
+
+/* ---------- Grundlayout ---------- */
+main{max-width:940px;margin:0 auto;padding:0 var(--pad) 96px}
+.section{margin-top:18px}
+.hint{color:var(--muted);font-size:13px}
+
+/* ---------- Portfolio-Band ---------- */
+.portfolio{
+  background:var(--sheet);border:1px solid var(--rule);border-radius:var(--r);
+  margin-top:14px;display:grid;grid-template-columns:repeat(3,1fr);
+}
+.portfolio div{padding:12px 14px;border-right:1px solid var(--rule-soft)}
+.portfolio div:last-child{border-right:0}
+.portfolio .v{font-size:19px;font-weight:600;letter-spacing:-0.02em}
+.portfolio .k{font-size:11.5px;color:var(--muted);margin-top:1px}
+
+/* ---------- Werkzeugleiste ---------- */
+.toolbar{display:flex;gap:8px;margin-top:14px;align-items:center}
+.search{
+  flex:1;background:var(--sheet);border:1px solid var(--rule);border-radius:var(--r);
+  padding:9px 11px;min-width:0;
+}
+.select{background:var(--sheet);border:1px solid var(--rule);border-radius:var(--r);padding:9px 8px}
+.chips{display:flex;gap:6px;overflow-x:auto;margin-top:10px;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+.chip{
+  white-space:nowrap;background:var(--sheet);border:1px solid var(--rule);
+  border-radius:100px;padding:5px 11px;font-size:13px;color:var(--ink-soft);
+}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+
+/* ---------- Objektliste ---------- */
+.list{margin-top:12px;background:var(--sheet);border:1px solid var(--rule);border-radius:var(--r);overflow:hidden}
+.row{
+  display:block;width:100%;text-align:left;background:transparent;border:0;
+  border-top:1px solid var(--rule-soft);padding:12px 14px 12px 16px;position:relative;
+}
+.row:first-child{border-top:0}
+.row:hover{background:var(--sheet-2)}
+.row::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--stripe,var(--rule))}
+.row .line1{display:flex;gap:10px;align-items:baseline}
+.row .name{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .price{font-weight:600;letter-spacing:-0.01em}
+.row .line2{display:flex;gap:10px;align-items:baseline;margin-top:3px;font-size:12.5px;color:var(--muted)}
+.row .line2 .loc{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row.dropped .name{text-decoration:line-through;color:var(--muted)}
+.metric-pos{color:var(--pos)}
+.metric-neg{color:var(--neg)}
+.badges{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+.badge{
+  font-size:11.5px;color:var(--muted);border:1px solid var(--rule);border-radius:3px;
+  padding:1px 6px;background:var(--sheet-2);
+}
+
+/* ---------- Leerzustand ---------- */
+.empty{
+  background:var(--sheet);border:1px dashed var(--rule);border-radius:var(--r);
+  padding:28px 20px;text-align:center;margin-top:12px;
+}
+.empty p{margin:6px 0 14px;color:var(--muted);font-size:14px}
+
+/* ---------- Knöpfe ---------- */
+.btn{
+  background:var(--sheet);border:1px solid var(--rule);border-radius:var(--r);
+  padding:9px 13px;font-size:14px;font-weight:500;
+}
+.btn:hover{background:var(--sheet-2)}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
+.btn.primary:hover{background:#22323f}
+.btn.danger{color:var(--neg);border-color:#d9b6b2}
+.btn.small{padding:6px 10px;font-size:13px}
+.fab{
+  position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom) + 16px);z-index:25;
+  background:var(--ink);color:#fff;border:0;border-radius:100px;
+  padding:14px 20px;font-size:15px;font-weight:600;box-shadow:0 6px 18px #17232f40;
+}
+
+/* ---------- Akte ---------- */
+.akte-head{padding-top:14px}
+.backlink{background:none;border:0;color:var(--blue);padding:0;font-size:14px}
+.akte-title{display:flex;gap:10px;align-items:flex-start;margin-top:8px}
+.akte-title h2{font-size:21px;flex:1;min-width:0}
+.akte-sub{color:var(--muted);font-size:13px;margin-top:2px}
+
+.kennzahlen{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+  background:var(--rule);border:1px solid var(--rule);border-radius:var(--r);
+  margin-top:14px;overflow:hidden;
+}
+.kz{background:var(--sheet);padding:12px 12px 11px}
+.kz .v{font-size:26px;font-weight:600;letter-spacing:-0.03em;line-height:1.1}
+.kz .k{font-size:11.5px;color:var(--muted);margin-top:3px}
+
+.tabs{display:flex;gap:2px;margin-top:16px;border-bottom:1px solid var(--rule);overflow-x:auto}
+.tab{
+  background:none;border:0;border-bottom:2px solid transparent;
+  padding:9px 12px;font-size:14px;color:var(--muted);white-space:nowrap;
+}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--gold);font-weight:600}
+.panel{padding-top:14px}
+
+/* ---------- Formular ---------- */
+.card{background:var(--sheet);border:1px solid var(--rule);border-radius:var(--r);padding:14px;margin-bottom:12px}
+.card > h3{font-size:14px;margin-bottom:10px}
+.grid{display:grid;grid-template-columns:1fr;gap:10px}
+@media(min-width:560px){ .grid{grid-template-columns:1fr 1fr} .grid .wide{grid-column:1/-1} }
+.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+.field input,.field select,.field textarea{
+  width:100%;background:var(--sheet-2);border:1px solid var(--rule);border-radius:var(--r);
+  padding:9px 10px;
+}
+.field input:focus,.field textarea:focus,.field select:focus{background:var(--sheet)}
+.field textarea{min-height:90px;resize:vertical}
+.field .suffix{position:relative}
+.field .suffix input{padding-right:38px}
+.field .suffix span{position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px}
+.calc-out{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-top:1px solid var(--rule-soft);font-size:14px}
+.calc-out:first-of-type{border-top:0}
+.calc-out b{font-weight:600;letter-spacing:-0.01em}
+.calc-out .lbl{color:var(--ink-soft)}
+
+/* ---------- Einträge (Links, Dateien, Schriftverkehr) ---------- */
+.entry{
+  background:var(--sheet);border:1px solid var(--rule);border-radius:var(--r);
+  padding:11px 12px;margin-bottom:8px;
+}
+.entry .top{display:flex;gap:8px;align-items:baseline}
+.entry .t{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.entry .meta{font-size:12px;color:var(--muted);margin-top:2px;word-break:break-word}
+.entry .body{margin-top:7px;font-size:14px;white-space:pre-wrap;color:var(--ink-soft)}
+.entry .acts{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+.entry.in{border-left:3px solid var(--blue)}
+.entry.out{border-left:3px solid var(--gold)}
+.dropzone{
+  border:1px dashed var(--rule);border-radius:var(--r);background:var(--sheet);
+  padding:20px;text-align:center;color:var(--muted);font-size:14px;margin-bottom:12px;
+}
+.dropzone.over{border-color:var(--blue);background:var(--blue-dim);color:var(--ink)}
+
+/* ---------- Dialog ---------- */
+dialog{
+  border:1px solid var(--rule);border-radius:10px;padding:0;background:var(--sheet);color:var(--ink);
+  width:min(560px,calc(100vw - 24px));max-height:86vh;overflow:auto;
+}
+dialog::backdrop{background:#0b141b99}
+.dlg-head{padding:14px 16px;border-bottom:1px solid var(--rule-soft);font-weight:600}
+.dlg-body{padding:14px 16px}
+.dlg-foot{padding:12px 16px;border-top:1px solid var(--rule-soft);display:flex;gap:8px;justify-content:flex-end}
+#viewer{width:min(900px,calc(100vw - 16px));height:86vh}
+#viewer .dlg-body{padding:0;height:calc(86vh - 106px)}
+#viewer iframe,#viewer img{width:100%;height:100%;border:0;object-fit:contain;background:var(--sheet-2)}
+
+/* ---------- Hinweisbanner ---------- */
+.banner{
+  background:var(--gold-dim);border:1px solid #e3cf95;border-radius:var(--r);
+  padding:10px 12px;font-size:13px;margin-top:12px;color:#5a4a15;
+}
+@media (prefers-color-scheme: dark){ .banner{color:#e8d9a8;border-color:#4a4022} }
+.toast{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 84px);
+  background:var(--ink);color:#fff;padding:9px 15px;border-radius:100px;font-size:14px;z-index:60;
+  opacity:0;pointer-events:none;transition:opacity .18s;
+}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important} }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><b>Immoakte</b><span id="brandSub">Objekte, Zahlen, Unterlagen</span></div>
+  <div class="spacer"></div>
+  <span class="offline-dot" title="Offline – alles läuft weiter"></span>
+  <button class="iconbtn" id="btnInstall" title="Auf dem Startbildschirm ablegen" hidden>⤓</button>
+  <button class="iconbtn" id="btnMenu" title="Sicherung und Speicher">☰</button>
+</header>
+
+<main>
+  <!-- Register -->
+  <section id="viewRegister">
+    <div class="portfolio">
+      <div><div class="v num" id="pfCount">0</div><div class="k">Objekte im Register</div></div>
+      <div><div class="v num" id="pfInvest">–</div><div class="k">Investition gesamt</div></div>
+      <div><div class="v num" id="pfCash">–</div><div class="k">Cashflow im Monat</div></div>
+    </div>
+
+    <div class="toolbar">
+      <input class="search" id="q" type="search" placeholder="Objekt, Ort oder Stichwort suchen" autocomplete="off">
+      <select class="select" id="sort" aria-label="Sortierung">
+        <option value="new">Zuletzt geändert</option>
+        <option value="faktor">Kaufpreisfaktor</option>
+        <option value="rendite">Bruttorendite</option>
+        <option value="cashflow">Cashflow</option>
+        <option value="preis">Kaufpreis</option>
+        <option value="name">Name</option>
+      </select>
+    </div>
+    <div class="chips" id="statusChips"></div>
+
+    <div id="listWrap"></div>
+  </section>
+
+  <!-- Akte -->
+  <section id="viewAkte" class="hidden">
+    <div class="akte-head">
+      <button class="backlink" id="btnBack">‹ Register</button>
+      <div class="akte-title">
+        <div style="flex:1;min-width:0">
+          <h2 id="akteName">–</h2>
+          <div class="akte-sub" id="akteSub"></div>
+        </div>
+        <select class="select" id="akteStatus" aria-label="Status"></select>
+      </div>
+    </div>
+
+    <div class="kennzahlen">
+      <div class="kz"><div class="v num" id="kzFaktor">–</div><div class="k">Kaufpreisfaktor</div></div>
+      <div class="kz"><div class="v num" id="kzRendite">–</div><div class="k">Bruttorendite</div></div>
+      <div class="kz"><div class="v num" id="kzCash">–</div><div class="k">Cashflow im Monat</div></div>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-tab="stamm">Objekt</button>
+      <button class="tab" role="tab" data-tab="kalk">Kalkulation</button>
+      <button class="tab" role="tab" data-tab="links">Anzeigen</button>
+      <button class="tab" role="tab" data-tab="docs">Dokumente</button>
+      <button class="tab" role="tab" data-tab="post">Schriftverkehr</button>
+    </div>
+    <div class="panel" id="panel"></div>
+  </section>
+</main>
+
+<button class="fab" id="fab">Objekt anlegen</button>
+
+<dialog id="dlg">
+  <form method="dialog">
+    <div class="dlg-head" id="dlgTitle">Titel</div>
+    <div class="dlg-body" id="dlgBody"></div>
+    <div class="dlg-foot">
+      <button class="btn" type="button" id="dlgCancel">Abbrechen</button>
+      <button class="btn primary" id="dlgOk" value="ok">Speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="viewer">
+  <div class="dlg-head" id="viewerTitle">Dokument</div>
+  <div class="dlg-body" id="viewerBody"></div>
+  <div class="dlg-foot">
+    <button class="btn" id="viewerDownload">Sichern</button>
+    <button class="btn primary" id="viewerClose">Schließen</button>
+  </div>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ============ Stammdaten der App ============ */
+const STATUS = [
+  {id:'beobachtung',  label:'Beobachtung',  color:'#8CA0AB'},
+  {id:'besichtigung', label:'Besichtigung', color:'#C8930F'},
+  {id:'angebot',      label:'Angebot',      color:'#1F5F8B'},
+  {id:'bestand',      label:'Im Bestand',   color:'#1E7A5A'},
+  {id:'verworfen',    label:'Verworfen',    color:'#B9C4C9'}
+];
+const statusOf = id => STATUS.find(s => s.id === id) || STATUS[0];
+
+// Grunderwerbsteuer in Prozent, Stand 2025 – im Objekt jederzeit überschreibbar
+const GREST = {
+  'Baden-Württemberg':5.0,'Bayern':3.5,'Berlin':6.0,'Brandenburg':6.5,'Bremen':5.0,
+  'Hamburg':5.5,'Hessen':6.0,'Mecklenburg-Vorpommern':6.0,'Niedersachsen':5.0,
+  'Nordrhein-Westfalen':6.5,'Rheinland-Pfalz':5.0,'Saarland':6.5,'Sachsen':5.5,
+  'Sachsen-Anhalt':5.0,'Schleswig-Holstein':6.5,'Thüringen':5.0
+};
+const TYPEN = ['Eigentumswohnung','Einfamilienhaus','Doppelhaushälfte','Reihenhaus','Mehrfamilienhaus','Gewerbe','Grundstück','Sonstiges'];
+const DOKKAT = ['Exposé','Grundriss','Energieausweis','Teilungserklärung','Protokoll','Kaufvertrag','Finanzierung','Rechnung','Foto','Sonstiges'];
+const POSTART = ['E-Mail','Brief','Telefonat','Notiz','Besichtigung'];
+
+/* ============ Zahlen und Text ============ */
+const fmt0 = new Intl.NumberFormat('de-DE',{maximumFractionDigits:0});
+const fmt1 = new Intl.NumberFormat('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1});
+const fmt2 = new Intl.NumberFormat('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
+const eur  = v => (v==null||!isFinite(v)) ? '–' : fmt0.format(Math.round(v)) + ' €';
+const eur2 = v => (v==null||!isFinite(v)) ? '–' : fmt2.format(v) + ' €';
+const pct  = (v,d=2) => (v==null||!isFinite(v)) ? '–' : (d===1?fmt1:fmt2).format(v) + ' %';
+const fak  = v => (v==null||!isFinite(v)||v<=0) ? '–' : fmt1.format(v) + '×';
+const parseNum = s => {
+  if (typeof s === 'number') return s;
+  if (s == null) return null;
+  let t = String(s).replace(/[^0-9,.\-]/g,'').trim();
+  if (!t) return null;
+  if (t.includes(',')) t = t.replace(/\./g,'').replace(',','.');
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g,'');  // 319.000 ist Tausendertrennung
+  else if ((t.match(/\./g)||[]).length > 1) t = t.replace(/\./g,'');
+  const n = parseFloat(t);
+  return isFinite(n) ? n : null;
+};
+const showNum = (v,d=0) => v==null||!isFinite(v) ? '' : new Intl.NumberFormat('de-DE',{maximumFractionDigits:d, minimumFractionDigits:0}).format(v);
+const esc = s => String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+const heute = () => new Date().toISOString().slice(0,10);
+const datum = s => { if(!s) return ''; const d = new Date(s); return isNaN(d) ? s : d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}); };
+const kb = b => b < 1024*1024 ? Math.max(1,Math.round(b/1024)) + ' kB' : fmt1.format(b/1048576) + ' MB';
+
+/* ============ Speicher: IndexedDB, sonst Arbeitsspeicher ============ */
+const Store = (() => {
+  let db = null, mem = null;
+  const memStore = {objects:new Map(), files:new Map()};
+
+  function open(){
+    return new Promise(res => {
+      let req;
+      try { req = indexedDB.open('immoakte', 1); }
+      catch(e){ mem = true; return res(false); }
+      req.onupgradeneeded = e => {
+        const d = e.target.result;
+        if (!d.objectStoreNames.contains('objects')) d.createObjectStore('objects',{keyPath:'id'});
+        if (!d.objectStoreNames.contains('files'))  d.createObjectStore('files',{keyPath:'id'}).createIndex('obj','objectId');
+      };
+      req.onsuccess = e => { db = e.target.result; res(true); };
+      req.onerror = () => { mem = true; res(false); };
+      req.onblocked = () => { mem = true; res(false); };
+      setTimeout(() => { if(!db && !mem){ mem = true; res(false); } }, 2500);
+    });
+  }
+  const tx = (name,mode) => db.transaction(name,mode).objectStore(name);
+  const p = req => new Promise((res,rej) => { req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); });
+
+  return {
+    get inMemory(){ return !!mem; },
+    open,
+    async all(name){
+      if (mem) return [...memStore[name].values()];
+      try { return await p(tx(name,'readonly').getAll()); } catch(e){ return []; }
+    },
+    async put(name,rec){
+      if (mem) { memStore[name].set(rec.id, rec); return rec; }
+      try { await p(tx(name,'readwrite').put(rec)); } catch(e){ memStore[name].set(rec.id,rec); }
+      return rec;
+    },
+    async get(name,id){
+      if (mem) return memStore[name].get(id);
+      try { return await p(tx(name,'readonly').get(id)); } catch(e){ return memStore[name].get(id); }
+    },
+    async del(name,id){
+      if (mem) { memStore[name].delete(id); return; }
+      try { await p(tx(name,'readwrite').delete(id)); } catch(e){ memStore[name].delete(id); }
+    }
+  };
+})();
+
+/* ============ Objektvorlage ============ */
+function neuesObjekt(){
+  return {
+    id: uid(), created: Date.now(), updated: Date.now(),
+    name:'', status:'beobachtung', typ:'Eigentumswohnung',
+    strasse:'', plz:'', ort:'', bundesland:'Bayern',
+    baujahr:null, flaeche:null, zimmer:null, etage:'', zustand:'', notiz:'',
+    kaufpreis:null, grest:GREST['Bayern'], notar:2.0, makler:3.57, nebenSonst:null, reno:null,
+    ek:null, zins:3.8, tilgung:2.0,
+    kaltmiete:null, mieteSonst:null,
+    verwaltung:null, ruecklage:12, wagnis:2, nichtUml:null,
+    links:[], post:[]
+  };
+}
+
+/* ============ Rechenkern ============ */
+function calc(o){
+  const n = v => (typeof v === 'number' && isFinite(v)) ? v : 0;
+  const kp = n(o.kaufpreis);
+  const nkGrest = kp * n(o.grest)/100;
+  const nkNotar = kp * n(o.notar)/100;
+  const nkMakler = kp * n(o.makler)/100;
+  const nebenkosten = nkGrest + nkNotar + nkMakler + n(o.nebenSonst);
+  const invest = kp + nebenkosten + n(o.reno);
+
+  const ek = n(o.ek);
+  const darlehen = Math.max(0, invest - ek);
+  const annuitaetJahr = darlehen * (n(o.zins) + n(o.tilgung))/100;
+  const rateMonat = annuitaetJahr/12;
+  const zinsJahr1 = darlehen * n(o.zins)/100;
+  const tilgungJahr1 = Math.max(0, annuitaetJahr - zinsJahr1);
+
+  const mieteMonat = n(o.kaltmiete) + n(o.mieteSonst);
+  const mieteJahr = mieteMonat * 12;
+  const kostenJahr = n(o.verwaltung)*12
+    + n(o.ruecklage) * n(o.flaeche)
+    + mieteJahr * n(o.wagnis)/100
+    + n(o.nichtUml)*12;
+  const reinertrag = mieteJahr - kostenJahr;
+
+  const bruttoRendite = kp > 0 ? mieteJahr/kp*100 : null;
+  const nettoRendite  = invest > 0 ? reinertrag/invest*100 : null;
+  const faktor        = mieteJahr > 0 ? kp/mieteJahr : null;
+  const cashflowMonat = reinertrag/12 - rateMonat;
+  const cashflowJahr  = cashflowMonat*12;
+  const vermoegen     = cashflowJahr + tilgungJahr1;
+  const ekRendite     = ek > 0 ? vermoegen/ek*100 : null;
+  const preisQm       = n(o.flaeche) > 0 ? kp/n(o.flaeche) : null;
+  const mieteQm       = n(o.flaeche) > 0 ? n(o.kaltmiete)/n(o.flaeche) : null;
+  const beleihung     = invest > 0 ? darlehen/invest*100 : null;
+
+  return {kp, nkGrest, nkNotar, nkMakler, nebenkosten, invest, darlehen, rateMonat, annuitaetJahr,
+          zinsJahr1, tilgungJahr1, mieteMonat, mieteJahr, kostenJahr, reinertrag, bruttoRendite,
+          nettoRendite, faktor, cashflowMonat, cashflowJahr, vermoegen, ekRendite, preisQm, mieteQm, beleihung};
+}
+
+
+/* ============ Zustand ============ */
+const $ = s => document.querySelector(s);
+const state = {objects:[], fileCount:{}, id:null, tab:'stamm', q:'', status:'alle', sort:'new'};
+const aktiv = () => state.objects.find(o => o.id === state.id);
+
+let toastTimer;
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+const saveTimers = {};
+function save(o, sofort){
+  o.updated = Date.now();
+  clearTimeout(saveTimers[o.id]);
+  if (sofort) return Store.put('objects', o);
+  saveTimers[o.id] = setTimeout(() => Store.put('objects', o), 350);
+}
+
+/* ============ Formularbausteine ============ */
+function fld(o,key,label,opt={}){
+  const cls = 'field' + (opt.wide ? ' wide' : '');
+  const v = o[key];
+  let ctrl;
+  if (opt.type === 'select'){
+    ctrl = `<select data-k="${key}">` + opt.options.map(x => {
+      const val = typeof x === 'object' ? x.id : x, lab = typeof x === 'object' ? x.label : x;
+      return `<option value="${esc(val)}"${val===v?' selected':''}>${esc(lab)}</option>`;
+    }).join('') + `</select>`;
+  } else if (opt.type === 'textarea'){
+    ctrl = `<textarea data-k="${key}" placeholder="${esc(opt.ph||'')}">${esc(v||'')}</textarea>`;
+  } else if (opt.type === 'num'){
+    const d = opt.dec ?? 0;
+    ctrl = `<div class="suffix"><input data-k="${key}" data-num="${d}" inputmode="decimal" autocomplete="off"
+            value="${showNum(v,d)}" placeholder="${esc(opt.ph||'')}"><span>${esc(opt.unit||'')}</span></div>`;
+  } else {
+    ctrl = `<input data-k="${key}" type="${opt.type||'text'}" value="${esc(v||'')}" placeholder="${esc(opt.ph||'')}" autocomplete="off">`;
+  }
+  return `<div class="${cls}"><label>${esc(label)}</label>${ctrl}</div>`;
+}
+const zeile = (l,v,cls='') => `<div class="calc-out"><span class="lbl">${esc(l)}</span><b class="num ${cls}">${v}</b></div>`;
+
+/* ============ Register ============ */
+function renderChips(){
+  const wrap = $('#statusChips');
+  const alle = [{id:'alle',label:'Alle'}].concat(STATUS);
+  wrap.innerHTML = alle.map(s => {
+    const n = s.id === 'alle' ? state.objects.length : state.objects.filter(o => o.status === s.id).length;
+    return `<button class="chip" data-status="${s.id}" aria-pressed="${state.status===s.id}">${esc(s.label)} ${n}</button>`;
+  }).join('');
+}
+
+function filtered(){
+  const q = state.q.toLowerCase().trim();
+  let list = state.objects.filter(o => {
+    if (state.status !== 'alle' && o.status !== state.status) return false;
+    if (!q) return true;
+    return [o.name,o.ort,o.strasse,o.plz,o.typ,o.notiz,o.zustand].join(' ').toLowerCase().includes(q);
+  });
+  const c = o => calc(o);
+  const s = state.sort;
+  list.sort((a,b) => {
+    if (s === 'name') return (a.name||'').localeCompare(b.name||'','de');
+    if (s === 'preis') return (b.kaufpreis||0) - (a.kaufpreis||0);
+    if (s === 'faktor') return (c(a).faktor ?? 1e9) - (c(b).faktor ?? 1e9);
+    if (s === 'rendite') return (c(b).bruttoRendite ?? -1) - (c(a).bruttoRendite ?? -1);
+    if (s === 'cashflow') return (c(b).cashflowMonat ?? -1e9) - (c(a).cashflowMonat ?? -1e9);
+    return b.updated - a.updated;
+  });
+  return list;
+}
+
+function renderRegister(){
+  renderChips();
+  const list = filtered();
+  let inv = 0, cf = 0;
+  state.objects.filter(o => o.status !== 'verworfen').forEach(o => { const c = calc(o); inv += c.invest; cf += c.cashflowMonat; });
+  $('#pfCount').textContent = state.objects.length;
+  $('#pfInvest').textContent = inv ? eur(inv) : '–';
+  const cfEl = $('#pfCash');
+  cfEl.textContent = inv ? eur(cf) : '–';
+  cfEl.className = 'v num ' + (inv ? (cf >= 0 ? 'metric-pos' : 'metric-neg') : '');
+
+  const wrap = $('#listWrap');
+  if (!state.objects.length){
+    wrap.innerHTML = `<div class="empty"><h3>Noch kein Objekt im Register</h3>
+      <p>Leg ein Objekt an und trag Kaufpreis und Miete ein. Kennzahlen, Anzeigenlinks, Dokumente und Schriftverkehr hängen dann alle an dieser Akte.</p>
+      <button class="btn primary" data-act="neu">Erstes Objekt anlegen</button>
+      <button class="btn" data-act="demo">Beispiel laden</button></div>`;
+    return;
+  }
+  if (!list.length){ wrap.innerHTML = `<div class="empty"><h3>Kein Treffer</h3><p>Andere Suche oder anderer Status zeigt wieder etwas an.</p></div>`; return; }
+
+  wrap.innerHTML = '<div class="list">' + list.map(o => {
+    const c = calc(o), st = statusOf(o.status);
+    const nLinks = (o.links||[]).length, nPost = (o.post||[]).length, nDok = state.fileCount[o.id]||0;
+    const badges = [
+      `<span class="badge">${esc(st.label)}</span>`,
+      o.flaeche ? `<span class="badge">${showNum(o.flaeche,0)} m²</span>` : '',
+      c.preisQm ? `<span class="badge">${eur(c.preisQm)}/m²</span>` : '',
+      nLinks ? `<span class="badge">${nLinks} Anzeige${nLinks>1?'n':''}</span>` : '',
+      nDok ? `<span class="badge">${nDok} Dokument${nDok>1?'e':''}</span>` : '',
+      nPost ? `<span class="badge">${nPost} Vorgang${nPost>1?'änge':''}</span>` : ''
+    ].join('');
+    return `<button class="row${o.status==='verworfen'?' dropped':''}" data-id="${o.id}" style="--stripe:${st.color}">
+      <span class="line1">
+        <span class="name">${esc(o.name || 'Ohne Bezeichnung')}</span>
+        <span class="price num">${o.kaufpreis ? eur(o.kaufpreis) : '–'}</span>
+      </span>
+      <span class="line2">
+        <span class="loc">${esc([o.strasse,[o.plz,o.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ') || o.typ)}</span>
+        <span class="num">${fak(c.faktor)}</span>
+        <span class="num ${c.cashflowMonat>=0?'metric-pos':'metric-neg'}">${o.kaufpreis?eur(c.cashflowMonat)+'/M':''}</span>
+      </span>
+      <span class="badges">${badges}</span>
+    </button>`;
+  }).join('') + '</div>';
+}
+
+/* ============ Akte ============ */
+function openAkte(id){
+  state.id = id; state.tab = 'stamm';
+  $('#viewRegister').classList.add('hidden');
+  $('#viewAkte').classList.remove('hidden');
+  $('#fab').classList.add('hidden');
+  $('#akteStatus').innerHTML = STATUS.map(s => `<option value="${s.id}">${esc(s.label)}</option>`).join('');
+  renderAkte();
+  window.scrollTo(0,0);
+}
+function closeAkte(){
+  state.id = null;
+  $('#viewAkte').classList.add('hidden');
+  $('#viewRegister').classList.remove('hidden');
+  $('#fab').classList.remove('hidden');
+  renderRegister();
+}
+function renderKopf(){
+  const o = aktiv(); if (!o) return;
+  const c = calc(o);
+  $('#akteName').textContent = o.name || 'Ohne Bezeichnung';
+  $('#akteSub').textContent = [o.typ, [o.strasse,[o.plz,o.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
+  $('#akteStatus').value = o.status;
+  $('#kzFaktor').textContent = fak(c.faktor);
+  $('#kzRendite').textContent = pct(c.bruttoRendite,2);
+  const k = $('#kzCash');
+  k.textContent = o.kaufpreis ? eur(c.cashflowMonat) : '–';
+  k.className = 'v num ' + (o.kaufpreis ? (c.cashflowMonat >= 0 ? 'metric-pos' : 'metric-neg') : '');
+}
+function renderAkte(){
+  renderKopf();
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === state.tab));
+  renderPanel();
+}
+
+async function renderPanel(){
+  const o = aktiv(); if (!o) return;
+  const p = $('#panel');
+  if (state.tab === 'stamm')      p.innerHTML = panelStamm(o);
+  else if (state.tab === 'kalk')  p.innerHTML = panelKalk(o);
+  else if (state.tab === 'links') p.innerHTML = panelLinks(o);
+  else if (state.tab === 'post')  p.innerHTML = panelPost(o);
+  else if (state.tab === 'docs')  p.innerHTML = await panelDocs(o);
+}
+
+function panelStamm(o){
+  return `<div class="card"><h3>Bezeichnung und Lage</h3><div class="grid">
+    ${fld(o,'name','Bezeichnung',{wide:true, ph:'z. B. 3-Zimmer Grafing, Bahnhofstraße'})}
+    ${fld(o,'typ','Objektart',{type:'select',options:TYPEN})}
+    ${fld(o,'bundesland','Bundesland',{type:'select',options:Object.keys(GREST)})}
+    ${fld(o,'strasse','Straße und Hausnummer',{wide:true})}
+    ${fld(o,'plz','PLZ')}
+    ${fld(o,'ort','Ort')}
+  </div></div>
+  <div class="card"><h3>Gebäude</h3><div class="grid">
+    ${fld(o,'flaeche','Wohnfläche',{type:'num',dec:1,unit:'m²'})}
+    ${fld(o,'zimmer','Zimmer',{type:'num',dec:1})}
+    ${fld(o,'baujahr','Baujahr',{ph:'z. B. 1994'})}
+    ${fld(o,'etage','Etage oder Lage im Haus')}
+    ${fld(o,'zustand','Zustand und Ausstattung',{wide:true, ph:'z. B. Bad 2019 saniert, Fenster 2-fach, Dach ungedämmt'})}
+  </div></div>
+  <div class="card"><h3>Notizen</h3>
+    ${fld(o,'notiz','Freier Text',{type:'textarea',ph:'Erster Eindruck, offene Fragen, Verhandlungsstand'})}
+  </div>
+  <div class="card"><h3>Akte</h3>
+    <p class="hint" style="margin:0 0 10px">Angelegt am ${datum(new Date(o.created).toISOString())}, zuletzt geändert ${datum(new Date(o.updated).toISOString())}.</p>
+    <button class="btn danger small" data-act="objLoeschen">Objekt mit allen Unterlagen löschen</button>
+  </div>`;
+}
+
+function panelKalk(o){
+  return `<div class="card"><h3>Kauf und Nebenkosten</h3><div class="grid">
+    ${fld(o,'kaufpreis','Kaufpreis',{type:'num',unit:'€'})}
+    ${fld(o,'grest','Grunderwerbsteuer',{type:'num',dec:2,unit:'%'})}
+    ${fld(o,'notar','Notar und Grundbuch',{type:'num',dec:2,unit:'%'})}
+    ${fld(o,'makler','Maklerprovision',{type:'num',dec:2,unit:'%'})}
+    ${fld(o,'nebenSonst','Weitere Erwerbskosten',{type:'num',unit:'€',ph:'Gutachten, Vermessung'})}
+    ${fld(o,'reno','Renovierung und Modernisierung',{type:'num',unit:'€'})}
+  </div></div>
+  <div class="card"><h3>Finanzierung</h3><div class="grid">
+    ${fld(o,'ek','Eigenkapital',{type:'num',unit:'€'})}
+    ${fld(o,'zins','Sollzins',{type:'num',dec:2,unit:'%'})}
+    ${fld(o,'tilgung','Anfängliche Tilgung',{type:'num',dec:2,unit:'%'})}
+  </div></div>
+  <div class="card"><h3>Einnahmen</h3><div class="grid">
+    ${fld(o,'kaltmiete','Kaltmiete im Monat',{type:'num',unit:'€'})}
+    ${fld(o,'mieteSonst','Weitere Mieten im Monat',{type:'num',unit:'€',ph:'Stellplatz, Werbefläche'})}
+  </div></div>
+  <div class="card"><h3>Laufende Kosten, die du selbst trägst</h3><div class="grid">
+    ${fld(o,'verwaltung','Verwaltung im Monat',{type:'num',unit:'€'})}
+    ${fld(o,'ruecklage','Instandhaltung je m² und Jahr',{type:'num',dec:2,unit:'€'})}
+    ${fld(o,'wagnis','Mietausfallwagnis',{type:'num',dec:1,unit:'%'})}
+    ${fld(o,'nichtUml','Nicht umlagefähige Nebenkosten im Monat',{type:'num',unit:'€'})}
+  </div></div>
+  <div class="card"><h3>Ergebnis</h3><div id="calcOut">${calcOut(o)}</div></div>`;
+}
+
+function calcOut(o){
+  const c = calc(o);
+  return zeile('Kaufpreis', eur(c.kp))
+    + zeile('Grunderwerbsteuer', eur(c.nkGrest))
+    + zeile('Notar und Grundbuch', eur(c.nkNotar))
+    + zeile('Makler', eur(c.nkMakler))
+    + zeile('Kaufnebenkosten gesamt', eur(c.nebenkosten))
+    + zeile('Gesamtinvestition', eur(c.invest))
+    + zeile('Darlehen', eur(c.darlehen))
+    + zeile('Beleihung', pct(c.beleihung,1))
+    + zeile('Rate im Monat', eur(c.rateMonat))
+    + zeile('davon Zins im ersten Jahr', eur(c.zinsJahr1/12))
+    + zeile('davon Tilgung im ersten Jahr', eur(c.tilgungJahr1/12))
+    + zeile('Jahreskaltmiete', eur(c.mieteJahr))
+    + zeile('Bewirtschaftungskosten im Jahr', eur(c.kostenJahr))
+    + zeile('Reinertrag im Jahr', eur(c.reinertrag))
+    + zeile('Kaufpreis je m²', eur(c.preisQm))
+    + zeile('Miete je m²', c.mieteQm ? eur2(c.mieteQm) : '–')
+    + zeile('Kaufpreisfaktor', fak(c.faktor))
+    + zeile('Bruttomietrendite', pct(c.bruttoRendite))
+    + zeile('Nettomietrendite', pct(c.nettoRendite))
+    + zeile('Cashflow im Monat', eur(c.cashflowMonat), c.cashflowMonat>=0?'metric-pos':'metric-neg')
+    + zeile('Cashflow im Jahr', eur(c.cashflowJahr), c.cashflowJahr>=0?'metric-pos':'metric-neg')
+    + zeile('Vermögenszuwachs im Jahr', eur(c.vermoegen))
+    + zeile('Eigenkapitalrendite', pct(c.ekRendite));
+}
+
+function panelLinks(o){
+  const items = (o.links||[]).slice().sort((a,b) => (b.datum||'').localeCompare(a.datum||''));
+  const body = items.length ? items.map(l => `<div class="entry">
+      <div class="top"><span class="t">${esc(l.titel || l.portal || 'Anzeige')}</span>
+      <span class="num" style="font-weight:600">${l.preis ? eur(l.preis) : ''}</span></div>
+      <div class="meta">${esc(l.url)}</div>
+      <div class="meta">${[l.portal, datum(l.datum)].filter(Boolean).map(esc).join(' · ')}</div>
+      ${l.notiz ? `<div class="body">${esc(l.notiz)}</div>` : ''}
+      <div class="acts">
+        <a class="btn small" href="${esc(l.url)}" target="_blank" rel="noopener">Anzeige öffnen</a>
+        <button class="btn small" data-act="linkKopieren" data-id="${l.id}">Link kopieren</button>
+        <button class="btn small" data-act="linkBearbeiten" data-id="${l.id}">Bearbeiten</button>
+        <button class="btn small danger" data-act="linkLoeschen" data-id="${l.id}">Löschen</button>
+      </div></div>`).join('')
+    : `<div class="empty"><h3>Keine Anzeige gespeichert</h3><p>Leg den Link zum Inserat ab, dazu Preis und Datum. So bleibt nachvollziehbar, was das Objekt wann kosten sollte.</p></div>`;
+  return `<button class="btn primary" data-act="linkNeu" style="margin-bottom:12px">Anzeige hinzufügen</button>${body}`;
+}
+
+function panelPost(o){
+  const items = (o.post||[]).slice().sort((a,b) => (b.datum||'').localeCompare(a.datum||''));
+  const body = items.length ? items.map(e => `<div class="entry ${e.richtung==='ein'?'in':'out'}">
+      <div class="top"><span class="t">${esc(e.betreff || e.art)}</span><span class="meta">${esc(datum(e.datum))}</span></div>
+      <div class="meta">${esc(e.art)} · ${e.richtung==='ein'?'von':'an'} ${esc(e.kontakt||'unbekannt')}</div>
+      ${e.text ? `<div class="body">${esc(e.text)}</div>` : ''}
+      <div class="acts">
+        <button class="btn small" data-act="postBearbeiten" data-id="${e.id}">Bearbeiten</button>
+        <button class="btn small danger" data-act="postLoeschen" data-id="${e.id}">Löschen</button>
+      </div></div>`).join('')
+    : `<div class="empty"><h3>Noch kein Vorgang erfasst</h3><p>Halte Telefonate, E-Mails und Briefe mit Makler, Verwaltung oder Bank fest, damit die Historie beim Objekt liegt.</p></div>`;
+  return `<button class="btn primary" data-act="postNeu" style="margin-bottom:12px">Vorgang erfassen</button>${body}`;
+}
+
+async function panelDocs(o){
+  const files = (await Store.all('files')).filter(f => f.objectId === o.id)
+    .sort((a,b) => b.added - a.added);
+  state.fileCount[o.id] = files.length;
+  const summe = files.reduce((s,f) => s + (f.size||0), 0);
+  const body = files.length ? files.map(f => `<div class="entry">
+      <div class="top"><span class="t">${esc(f.name)}</span><span class="meta num">${kb(f.size)}</span></div>
+      <div class="meta">${esc(f.kat)} · abgelegt ${esc(datum(new Date(f.added).toISOString()))}</div>
+      <div class="acts">
+        <button class="btn small" data-act="dokOeffnen" data-id="${f.id}">Öffnen</button>
+        <button class="btn small" data-act="dokSichern" data-id="${f.id}">Sichern</button>
+        <select class="btn small" data-act="dokKat" data-id="${f.id}">
+          ${DOKKAT.map(k => `<option${k===f.kat?' selected':''}>${esc(k)}</option>`).join('')}
+        </select>
+        <button class="btn small danger" data-act="dokLoeschen" data-id="${f.id}">Löschen</button>
+      </div></div>`).join('')
+    : `<div class="empty"><h3>Keine Dokumente</h3><p>Exposé, Grundriss, Energieausweis, Protokolle und Verträge liegen hier als PDF oder Bild und bleiben offline verfügbar.</p></div>`;
+  return `<div class="dropzone" id="drop">Dateien hierher ziehen oder
+      <button class="btn small" data-act="dokWaehlen">Dateien auswählen</button>
+      <input type="file" id="fileInput" multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx,.eml,.msg,.txt" hidden>
+    </div>
+    ${files.length ? `<p class="hint" style="margin:0 0 10px">${files.length} Dateien, ${kb(summe)} in dieser Akte.</p>` : ''}
+    ${body}`;
+}
+
+
+/* ============ Dialog ============ */
+function dialog(title, html, onOk, okLabel, ohneAbbruch){
+  const d = $('#dlg');
+  $('#dlgCancel').hidden = !!ohneAbbruch;
+  $('#dlgTitle').textContent = title;
+  $('#dlgBody').innerHTML = html;
+  $('#dlgOk').textContent = okLabel || 'Speichern';
+  d.returnValue = '';
+  const handler = () => {
+    d.removeEventListener('close', handler);
+    if (d.returnValue !== 'ok') return;
+    const data = {};
+    d.querySelectorAll('[name]').forEach(el => data[el.name] = el.value);
+    onOk(data);
+  };
+  d.addEventListener('close', handler);
+  d.showModal();
+  setTimeout(() => { const f = d.querySelector('input,select,textarea'); if (f) f.focus(); }, 60);
+}
+const df = (name,label,opt={}) => {
+  const v = opt.value ?? '';
+  let ctrl;
+  if (opt.type === 'select') ctrl = `<select name="${name}">${opt.options.map(x => {
+      const val = typeof x === 'object' ? x.id : x, lab = typeof x === 'object' ? x.label : x;
+      return `<option value="${esc(val)}"${String(val)===String(v)?' selected':''}>${esc(lab)}</option>`;
+    }).join('')}</select>`;
+  else if (opt.type === 'textarea') ctrl = `<textarea name="${name}" placeholder="${esc(opt.ph||'')}">${esc(v)}</textarea>`;
+  else ctrl = `<input name="${name}" type="${opt.type||'text'}" value="${esc(v)}" placeholder="${esc(opt.ph||'')}" inputmode="${opt.inputmode||'text'}">`;
+  return `<div class="field" style="margin-bottom:10px"><label>${esc(label)}</label>${ctrl}</div>`;
+};
+
+function linkDialog(vorhanden){
+  const l = vorhanden || {datum:heute()};
+  dialog(vorhanden ? 'Anzeige bearbeiten' : 'Anzeige hinzufügen',
+    df('url','Link zur Anzeige',{value:l.url,type:'url',ph:'https://…',inputmode:'url'})
+    + df('titel','Bezeichnung',{value:l.titel,ph:'z. B. Exposé ImmoScout'})
+    + df('portal','Portal oder Quelle',{value:l.portal,ph:'ImmoScout24, Kleinanzeigen, Makler'})
+    + df('preis','Angebotspreis in €',{value:l.preis?showNum(l.preis):'',inputmode:'decimal'})
+    + df('datum','Datum',{value:l.datum,type:'date'})
+    + df('notiz','Notiz',{value:l.notiz,type:'textarea',ph:'Was steht drin, was fehlt'}),
+    d => {
+      const o = aktiv(); if (!o) return;
+      o.links = o.links || [];
+      const rec = {id: l.id || uid(), url:d.url.trim(), titel:d.titel.trim(), portal:d.portal.trim(),
+                   preis:parseNum(d.preis), datum:d.datum, notiz:d.notiz.trim()};
+      if (!rec.url && !rec.titel) return;
+      if (l.id) o.links = o.links.map(x => x.id === l.id ? rec : x); else o.links.push(rec);
+      save(o, true); renderPanel(); toast('Anzeige gespeichert');
+    });
+}
+
+function postDialog(vorhanden){
+  const e = vorhanden || {datum:heute(), art:'E-Mail', richtung:'aus'};
+  dialog(vorhanden ? 'Vorgang bearbeiten' : 'Vorgang erfassen',
+    df('datum','Datum',{value:e.datum,type:'date'})
+    + df('art','Art',{value:e.art,type:'select',options:POSTART})
+    + df('richtung','Richtung',{value:e.richtung,type:'select',options:[{id:'aus',label:'von mir hinaus'},{id:'ein',label:'bei mir eingegangen'}]})
+    + df('kontakt','Person oder Firma',{value:e.kontakt,ph:'Makler, Verwaltung, Bank, Verkäufer'})
+    + df('betreff','Betreff',{value:e.betreff})
+    + df('text','Inhalt',{value:e.text,type:'textarea',ph:'Was wurde besprochen oder vereinbart'}),
+    d => {
+      const o = aktiv(); if (!o) return;
+      o.post = o.post || [];
+      const rec = {id: e.id || uid(), datum:d.datum, art:d.art, richtung:d.richtung,
+                   kontakt:d.kontakt.trim(), betreff:d.betreff.trim(), text:d.text.trim()};
+      if (e.id) o.post = o.post.map(x => x.id === e.id ? rec : x); else o.post.push(rec);
+      save(o, true); renderPanel(); toast('Vorgang gespeichert');
+    });
+}
+
+/* ============ Dokumente ============ */
+function katVorschlag(name){
+  const n = name.toLowerCase();
+  if (/expos|inserat|anzeige/.test(n)) return 'Exposé';
+  if (/grundriss|plan|schnitt/.test(n)) return 'Grundriss';
+  if (/energie/.test(n)) return 'Energieausweis';
+  if (/teilung|gemeinschaftsordnung/.test(n)) return 'Teilungserklärung';
+  if (/protokoll|versammlung/.test(n)) return 'Protokoll';
+  if (/vertrag|kauf|notar/.test(n)) return 'Kaufvertrag';
+  if (/darlehen|finanzier|bank|zins/.test(n)) return 'Finanzierung';
+  if (/rechnung|angebot|kostenvoranschlag/.test(n)) return 'Rechnung';
+  if (/\.(jpe?g|png|heic|webp)$/.test(n)) return 'Foto';
+  return 'Sonstiges';
+}
+async function dateienAblegen(list){
+  const o = aktiv(); if (!o || !list || !list.length) return;
+  let n = 0;
+  for (const file of list){
+    if (file.size > 30*1024*1024){ toast(file.name + ' ist größer als 30 MB'); continue; }
+    await Store.put('files', {id:uid(), objectId:o.id, name:file.name,
+      type:file.type || 'application/octet-stream', size:file.size,
+      kat:katVorschlag(file.name), added:Date.now(), blob:file});
+    n++;
+  }
+  if (n) { toast(n + (n>1?' Dateien abgelegt':' Datei abgelegt')); renderPanel(); }
+}
+function download(blob, name){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+let viewerUrl = null;
+async function dokOeffnen(id){
+  const f = await Store.get('files', id); if (!f) return;
+  const url = URL.createObjectURL(f.blob);
+  const istPdf = /pdf/.test(f.type) || /\.pdf$/i.test(f.name);
+  const istBild = /^image\//.test(f.type);
+  if (!istPdf && !istBild){ download(f.blob, f.name); URL.revokeObjectURL(url); return; }
+  if (viewerUrl) URL.revokeObjectURL(viewerUrl);
+  viewerUrl = url;
+  $('#viewerTitle').textContent = f.name;
+  $('#viewerBody').innerHTML = istPdf
+    ? `<iframe src="${url}#view=FitH" title="${esc(f.name)}"></iframe>`
+    : `<img src="${url}" alt="${esc(f.name)}">`;
+  $('#viewer').dataset.file = id;
+  $('#viewer').showModal();
+}
+
+/* ============ Sicherung und Speicher ============ */
+const blobToB64 = blob => new Promise(res => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.readAsDataURL(blob); });
+const b64ToBlob = (b64,type) => { const bin = atob(b64); const arr = new Uint8Array(bin.length); for (let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i); return new Blob([arr],{type}); };
+
+async function sicherung(mitDateien){
+  const objects = await Store.all('objects');
+  const data = {app:'immoakte', version:1, erstellt:new Date().toISOString(), objects};
+  if (mitDateien){
+    data.files = [];
+    for (const f of await Store.all('files')){
+      data.files.push({id:f.id, objectId:f.objectId, name:f.name, type:f.type, size:f.size,
+                       kat:f.kat, added:f.added, data: await blobToB64(f.blob)});
+    }
+  }
+  download(new Blob([JSON.stringify(data)],{type:'application/json'}), `immoakte-${heute()}${mitDateien?'-mit-dokumenten':''}.json`);
+  toast('Sicherung erstellt');
+}
+async function sicherungLesen(file){
+  try {
+    const data = JSON.parse(await file.text());
+    if (data.app !== 'immoakte') { toast('Das ist keine Immoakte-Sicherung'); return; }
+    for (const o of data.objects || []) await Store.put('objects', o);
+    for (const f of data.files || []) await Store.put('files', {...f, data:undefined, blob:b64ToBlob(f.data, f.type)});
+    await laden();
+    toast('Sicherung eingelesen');
+  } catch(e){ toast('Datei konnte nicht gelesen werden'); }
+}
+async function menue(){
+  let speicher = '';
+  try {
+    const est = await navigator.storage.estimate();
+    speicher = `<p class="hint">Belegt: ${kb(est.usage||0)} von rund ${kb(est.quota||0)} verfügbarem Gerätespeicher.</p>`;
+  } catch(e){}
+  const dauerhaft = navigator.storage && navigator.storage.persist
+    ? `<button type="button" class="btn small" data-act="persist">Speicher dauerhaft sichern</button>` : '';
+  dialog('Sicherung und Speicher',
+    `<p class="hint" style="margin-top:0">Alle Daten liegen ausschließlich auf diesem Gerät. Eine Sicherung ist die einzige Kopie, wenn das Gerät verloren geht.</p>
+     <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
+       <button type="button" class="btn small" data-act="expJson">Objekte sichern</button>
+       <button type="button" class="btn small" data-act="expAlles">Objekte mit Dokumenten sichern</button>
+       <button type="button" class="btn small" data-act="impJson">Sicherung einlesen</button>
+       ${dauerhaft}
+     </div>${speicher}
+     <input type="file" id="impInput" accept="application/json" hidden>`,
+    () => {}, 'Fertig', true);
+}
+
+/* ============ Beispiel ============ */
+async function beispiel(){
+  const o = neuesObjekt();
+  Object.assign(o, {
+    name:'3-Zimmer-Wohnung Grafing', typ:'Eigentumswohnung', strasse:'Bahnhofstraße 14',
+    plz:'85567', ort:'Grafing', bundesland:'Bayern', baujahr:1994, flaeche:78, zimmer:3,
+    etage:'2. OG mit Balkon nach Süden', zustand:'Bad 2019 saniert, Fenster zweifach, Heizung Gas 2011',
+    kaufpreis:349000, grest:3.5, notar:2, makler:3.57, reno:18000,
+    ek:90000, zins:3.8, tilgung:2,
+    kaltmiete:1080, verwaltung:32, ruecklage:12, wagnis:2, nichtUml:15,
+    notiz:'Verwalterprotokolle der letzten drei Jahre stehen noch aus. Rücklage laut Verkäufer rund 42.000 €.',
+    links:[{id:uid(), url:'https://www.immobilienscout24.de/expose/beispiel', titel:'Exposé ImmoScout24',
+            portal:'ImmoScout24', preis:349000, datum:heute(), notiz:'Erstinserat, Preis noch nicht reduziert.'}],
+    post:[{id:uid(), datum:heute(), art:'Telefonat', richtung:'aus', kontakt:'Makler Berger',
+           betreff:'Besichtigungstermin', text:'Termin am Samstag 10 Uhr vereinbart. Protokolle werden per Mail geschickt.'}]
+  });
+  await Store.put('objects', o);
+  await laden();
+  toast('Beispielakte angelegt');
+}
+
+/* ============ Ereignisse ============ */
+document.addEventListener('click', async e => {
+  const row = e.target.closest('.row');
+  if (row && !e.target.closest('[data-act]')) { openAkte(row.dataset.id); return; }
+
+  const chip = e.target.closest('.chip');
+  if (chip){ state.status = chip.dataset.status; renderRegister(); return; }
+
+  const tab = e.target.closest('.tab');
+  if (tab){ state.tab = tab.dataset.tab; renderAkte(); return; }
+
+  const btn = e.target.closest('[data-act]');
+  if (!btn) return;
+  const act = btn.dataset.act, id = btn.dataset.id, o = aktiv();
+
+  if (act === 'neu'){ const n = neuesObjekt(); await Store.put('objects', n); state.objects.push(n); openAkte(n.id); toast('Objekt angelegt'); }
+  else if (act === 'demo') beispiel();
+  else if (act === 'linkNeu') linkDialog();
+  else if (act === 'linkBearbeiten') linkDialog(o.links.find(l => l.id === id));
+  else if (act === 'linkLoeschen'){ o.links = o.links.filter(l => l.id !== id); save(o,true); renderPanel(); toast('Anzeige gelöscht'); }
+  else if (act === 'linkKopieren'){
+    const l = o.links.find(x => x.id === id);
+    try { await navigator.clipboard.writeText(l.url); toast('Link kopiert'); } catch(err){ toast(l.url); }
+  }
+  else if (act === 'postNeu') postDialog();
+  else if (act === 'postBearbeiten') postDialog(o.post.find(p => p.id === id));
+  else if (act === 'postLoeschen'){ o.post = o.post.filter(p => p.id !== id); save(o,true); renderPanel(); toast('Vorgang gelöscht'); }
+  else if (act === 'dokWaehlen') $('#fileInput').click();
+  else if (act === 'dokOeffnen') dokOeffnen(id);
+  else if (act === 'dokSichern'){ const f = await Store.get('files', id); if (f) download(f.blob, f.name); }
+  else if (act === 'dokLoeschen'){ if (confirm('Dokument endgültig löschen?')){ await Store.del('files', id); state.fileCount[o.id] = Math.max(0,(state.fileCount[o.id]||1)-1); renderPanel(); toast('Dokument gelöscht'); } }
+  else if (act === 'objLoeschen'){
+    if (!confirm('Objekt mit allen Anzeigen, Dokumenten und Vorgängen löschen?')) return;
+    for (const f of (await Store.all('files')).filter(f => f.objectId === o.id)) await Store.del('files', f.id);
+    await Store.del('objects', o.id);
+    closeAkte(); await laden(); toast('Objekt gelöscht');
+  }
+  else if (act === 'expJson') sicherung(false);
+  else if (act === 'expAlles') sicherung(true);
+  else if (act === 'impJson') $('#impInput').click();
+  else if (act === 'persist'){ const ok = await navigator.storage.persist(); toast(ok ? 'Speicher ist dauerhaft gesichert' : 'Das Gerät hat das abgelehnt'); }
+});
+
+document.addEventListener('change', async e => {
+  if (e.target.id === 'fileInput'){ await dateienAblegen(e.target.files); e.target.value = ''; }
+  if (e.target.id === 'impInput' && e.target.files[0]) sicherungLesen(e.target.files[0]);
+  const katSel = e.target.closest('[data-act="dokKat"]');
+  if (katSel){ const f = await Store.get('files', katSel.dataset.id); if (f){ f.kat = katSel.value; await Store.put('files', f); toast('Kategorie geändert'); } }
+});
+
+$('#panel').addEventListener('input', e => {
+  const el = e.target.closest('[data-k]'); if (!el) return;
+  const o = aktiv(); if (!o) return;
+  const k = el.dataset.k;
+  if (el.dataset.num !== undefined) o[k] = parseNum(el.value);
+  else o[k] = el.value;
+  if (k === 'bundesland' && GREST[el.value] != null){
+    o.grest = GREST[el.value];
+    toast('Grunderwerbsteuer auf ' + fmt1.format(o.grest) + ' % gesetzt');
+  }
+  save(o);
+  renderKopf();
+  const out = $('#calcOut'); if (out) out.innerHTML = calcOut(o);
+});
+$('#panel').addEventListener('change', e => {
+  const el = e.target.closest('[data-num]'); if (!el) return;
+  const o = aktiv(); if (!o) return;
+  el.value = showNum(o[el.dataset.k], Number(el.dataset.num));
+});
+
+$('#q').addEventListener('input', e => { state.q = e.target.value; renderRegister(); });
+$('#sort').addEventListener('change', e => { state.sort = e.target.value; renderRegister(); });
+$('#btnBack').addEventListener('click', closeAkte);
+$('#btnMenu').addEventListener('click', menue);
+$('#fab').addEventListener('click', async () => { const n = neuesObjekt(); await Store.put('objects', n); state.objects.push(n); openAkte(n.id); });
+$('#akteStatus').addEventListener('change', e => { const o = aktiv(); o.status = e.target.value; save(o,true); toast('Status: ' + statusOf(o.status).label); });
+$('#dlgCancel').addEventListener('click', () => $('#dlg').close('cancel'));
+$('#viewerClose').addEventListener('click', () => $('#viewer').close());
+$('#viewer').addEventListener('close', () => { if (viewerUrl){ URL.revokeObjectURL(viewerUrl); viewerUrl = null; } $('#viewerBody').innerHTML = ''; });
+$('#viewerDownload').addEventListener('click', async () => { const f = await Store.get('files', $('#viewer').dataset.file); if (f) download(f.blob, f.name); });
+
+document.addEventListener('dragover', e => { const d = $('#drop'); if (!d) return; e.preventDefault(); d.classList.add('over'); });
+document.addEventListener('dragleave', e => { const d = $('#drop'); if (d && !e.relatedTarget) d.classList.remove('over'); });
+document.addEventListener('drop', async e => {
+  const d = $('#drop'); if (!d) return;
+  e.preventDefault(); d.classList.remove('over');
+  await dateienAblegen(e.dataTransfer.files);
+});
+
+const setzOffline = () => document.body.classList.toggle('is-offline', !navigator.onLine);
+window.addEventListener('online', setzOffline); window.addEventListener('offline', setzOffline);
+
+let installEvent = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvent = e; $('#btnInstall').hidden = false; });
+$('#btnInstall').addEventListener('click', async () => {
+  if (!installEvent) return;
+  installEvent.prompt(); await installEvent.userChoice; installEvent = null; $('#btnInstall').hidden = true;
+});
+
+/* ============ Start ============ */
+async function laden(){
+  state.objects = await Store.all('objects');
+  const files = await Store.all('files');
+  state.fileCount = {};
+  files.forEach(f => state.fileCount[f.objectId] = (state.fileCount[f.objectId]||0)+1);
+  if (state.id && aktiv()) renderAkte(); else renderRegister();
+}
+(async function init(){
+  await Store.open();
+  await laden();
+  setzOffline();
+  if (Store.inMemory){
+    const b = document.createElement('div');
+    b.className = 'banner';
+    b.textContent = 'Dieser Browser gibt der Seite gerade keinen dauerhaften Speicher. Die App läuft vollständig, die Eingaben verschwinden aber beim Schließen. Auf einem eigenen Hosting bleibt alles erhalten.';
+    $('#viewRegister').prepend(b);
+  }
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+})();
+})();
+
+</script>
+</body>
+</html>
